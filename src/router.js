@@ -4,9 +4,8 @@ import { inherits } from 'util';
 import UUID from 'uuid-1345';
 
 export function Router(adapter, options) {
-  var router = express.Router();
-
-  var adapter = adapter;
+  const router = express.Router();
+  const model = adapter;
 
   router.get('/', function (req, res, next) {
     builds(adapter).then(function (builds) {
