@@ -1,11 +1,28 @@
 import express from 'express';
 import { state } from 'ci-adapter';
 import { inherits } from 'util';
-import UUID from 'uuid-1345';
+import { id } from './id';
+import { Model, Build, Builder } from './model';
 
 export function Router(adapter, options) {
   const router = express.Router();
-  const model = adapter;
+  const model = Model(adapter, {
+    id: {
+      get: function () {
+        return this.data.then(id);
+      }
+    },
+    url: {
+      get: function () {
+        if (this instanceof Build) {
+          return this.id.then(id => `/builds/${id}`);
+        }
+        if (this instanceof Builder) {
+          return this.id.then(id => `/builders/${id}`);
+        }
+      }
+    }
+  });
 
   router.get('/', function (req, res, next) {
     builds(adapter).then(function (builds) {
@@ -17,11 +34,11 @@ export function Router(adapter, options) {
   });
 
   router.get('/builders', function (req, res, next) {
-    builders(adapter).then(send(res), error(res));
+    model.builders().then(send(res), error(res));
   });
 
   router.get('/builds', function (req, res, next) {
-    builds(adapter).then(send(res), error(res));
+    model.builds().then(send(res), error(res));
   });
 
   router.get('/latest', function (req, res, next) {
@@ -38,21 +55,14 @@ function send(res) {
 }
 
 function error(res) {
-  return err => res.status(500).send(err);
-}
-
-function uuid(url) {
-  return new Promise(function (resolve, reject) {
-    UUID.v5({
-      namespace: UUID.namespace.url,
-      name: url
-    }, function (err, uuid) {
-      if (err) return reject(err);
-      resolve(uuid);
+  return function (err) {
+    res.status(500);
+    res.send({
+      message: err.toString()
     });
-  });
+    console.log(err);
+  };
 }
-
 
 function pmap(promise, callback) {
   return promise.then(list => Promise.all(list.map(callback)));
@@ -65,11 +75,12 @@ function pfmap(promise, callback) {
 function builders(adapter) {
   return pmap(adapter.getBuilders(), function (builder) {
     return pmap(adapter.getBuilds(builder), function (build) {
-      return uuid(build.url);
+      return id(build);
     }).then(function (builds) {
-      return uuid(builder.url).then(function (uuid) {
+      return id(builder).then(function (id) {
         return {
-          id: uuid,
+          id: id,
+          html_url: builder.html_url,
           name: builder.name,
           builds: builds
         };
@@ -80,13 +91,14 @@ function builders(adapter) {
 
 function builds(adapter) {
   return pfmap(adapter.getBuilders(), adapter.getBuilds).then(function (builds) {
-    const sorted = builds.sort( (a, b) => b.end.getTime() - a.end.getTime() );
-    console.log( sorted );
+    const now = new Date();
+    const sorted = builds.sort( (a, b) => (b.end || now).getTime() - (a.end || now).getTime() );
 
     return Promise.all(sorted.map(function (build) {
-      return uuid(build.url).then(function (uuid) {
+      return id(build).then(function (id) {
         return {
-          id: uuid,
+          id: id,
+          html_url: build.html_url,
           name: build.name,
           number: build.number,
           state: build.state,

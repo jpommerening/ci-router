@@ -1,5 +1,5 @@
 
-function bindModel(ctor, properties) {
+function bindModel(ctor, ...properties) {
   const props = Object.assign({
     constructor: {
       value: constructor,
@@ -7,7 +7,7 @@ function bindModel(ctor, properties) {
       writable: true,
       configurable: true
     }
-  }, properties);
+  }, ...properties);
   const proto = Object.create(ctor.prototype, props);
 
   constructor.prototype = proto;
@@ -22,33 +22,53 @@ function bindModel(ctor, properties) {
   }
 }
 
+export function Relation() {
+}
+
+export function Entity() {
+}
 
 export function Model(adapter, properties = {}) {
+  if (!(this instanceof Model)) {
+    return new Model(adapter, properties);
+  }
+
   this.ids = [];
   this.objects = {
   };
 
   this.adapter = adapter;
 
-  this.builder = bindModel(Builder, properties);
-  this.build = bindModel(Build, properties);
+  const builder = bindModel(Builder, properties, {
+    builds: {
+      get: function () {
+        return builds(this);
+      }
+    }
+  });
+  const build = bindModel(Build, properties);
 
-  this.builders = function builders() {
+  this.builder = builder;
+  this.build = build;
+  this.builders = builders;
+  this.builds = builds;
+
+  function builders() {
     return adapter.getBuilders()
       .then(builders => Promise.all(builders.map(data => this.builder(data))));
-  };
-  this.builds = function builds(...builders) {
+  }
+
+  function builds(...builders) {
     if (builders.length === 0) {
-      return this.builders().then(builders => this.builds(...builders));
+      return this.builders().then(builders => builds(...builders));
     } else if (builders.length === 1) {
-      return builders[ 0 ].data
-        .then(data => this.adapter.getBuilds(data))
-        .then(builds => Promise.all(builds.map(data => this.build(data))));
+      return adapter.getBuilds(builders[ 0 ].data)
+        .then(builds => Promise.all(builds.map(data => build(data))));
     } else {
-      return Promise.all(builders.map(builder => this.builds(builder)))
+      return Promise.all(builders.map(builder => builds(builder)))
         .then(builds => [].concat(...builds));
     }
-  };
+  }
 }
 
 export function Builder(data) {
