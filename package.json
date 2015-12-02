@@ -19,7 +19,7 @@
   "author": "Jonas Pommerening",
   "license": "MIT",
   "dependencies": {
-    "ci-adapter": "^0.1.1",
+    "ci-adapter": "^0.1.2",
     "url-template": "^2.0.6",
     "uuid-1345": "^0.99.6"
   },

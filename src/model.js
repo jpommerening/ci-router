@@ -46,7 +46,13 @@ export function Model(adapter, properties = {}) {
       }
     }
   });
-  const build = bindModel(Build, properties);
+  const build = bindModel(Build, properties, {
+    builder: {
+      get: function () {
+        return Promise.resolve(null);
+      }
+    }
+  });
 
   this.builder = builder;
   this.build = build;

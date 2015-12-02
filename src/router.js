@@ -9,7 +9,7 @@ export function Router(adapter, options) {
   const model = Model(adapter, {
     id: {
       get: function () {
-        return this.data.then(id);
+        return id(this.data);
       }
     },
     url: {
@@ -25,26 +25,32 @@ export function Router(adapter, options) {
   });
 
   router.get('/', function (req, res, next) {
-    builds(adapter).then(function (builds) {
-      return {
-        builds: builds.map(build => build.id),
-        latest: builds[0]
-      };
-    });
+    const builders = model.builders();
+    const builds = model.builds();
+
+    Promise.all([
+      builders.then(builders => Promise.all(builders.map(builder => builder.id))),
+      builds.then(builds => Promise.all(builds.map(build => build.id))),
+      builds.then(builds => builds.filter(build => build.state === state.PENDING))
+    ]).then(([ builders, builds, pending ]) => ({ builders, builds, pending })).then(send(res), error(res));
   });
 
   router.get('/builders', function (req, res, next) {
-    model.builders().then(send(res), error(res));
+    model.builders()
+      .then(builders => builders.map(builder => builder.data))
+      .then(send(res), error(res));
   });
 
   router.get('/builds', function (req, res, next) {
-    model.builds().then(send(res), error(res));
+    model.builds()
+      .then(builds => builds.map(build => build.data))
+      .then(send(res), error(res));
   });
 
   router.get('/latest', function (req, res, next) {
-    builds(adapter).then(function (builds) {
-      return builds[0];
-    }).then(send(res), error(res));
+    model.builds()
+      .then(builds => builds[ 0 ].data)
+      .then(send(res), error(res));
   });
 
   return router;
