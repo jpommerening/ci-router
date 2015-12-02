@@ -64,16 +64,16 @@ export function Model(adapter, properties = {}) {
       .then(builders => Promise.all(builders.map(data => this.builder(data))));
   }
 
+  function cmp(a, b) {
+    const now = new Date();
+    return (b.end || now).getTime() - (a.end || now).getTime();
+  }
+
   function builds(...builders) {
-    if (builders.length === 0) {
-      return this.builders().then(builders => builds(...builders));
-    } else if (builders.length === 1) {
-      return adapter.getBuilds(builders[ 0 ].data)
-        .then(builds => Promise.all(builds.map(data => build(data))));
-    } else {
-      return Promise.all(builders.map(builder => builds(builder)))
-        .then(builds => [].concat(...builds));
-    }
+    return ((builders.length === 0) ? this.builders() : Promise.all(builders))
+      .then(builders => Promise.all(builders.map(builder => adapter.getBuilds(builder.data))))
+      .then(builds => [].concat(...builds).sort(cmp))
+      .then(builds => builds.map(data => build(data)));
   }
 }
 

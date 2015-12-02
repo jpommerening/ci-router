@@ -2,7 +2,7 @@
   "name": "ci-router",
   "version": "0.1.0",
   "description": "Express/Connect compatible middleware for CI status access",
-  "main": "index.js",
+  "main": "./lib",
   "scripts": {
     "prepublish": "babel -d lib src",
     "test": "mocha --compilers js:babel-core/register"
