@@ -57,61 +57,19 @@ export function Router(adapter, options) {
 }
 
 function send(res) {
-  return data => res.send(data);
+  return function (data) {
+    res.setHeader('Content-Type', 'application/json');
+    res.write(JSON.stringify(data));
+    res.end();
+  }
+  return data => res.json(data);
 }
 
 function error(res) {
   return function (err) {
-    res.status(500);
-    res.send({
-      message: err.toString()
-    });
-    console.log(err);
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    res.write(JSON.stringify({ message: err.toString() }));
+    res.end();
   };
-}
-
-function pmap(promise, callback) {
-  return promise.then(list => Promise.all(list.map(callback)));
-}
-
-function pfmap(promise, callback) {
-  return pmap(promise, callback).then(lists => [].concat( ...lists ));
-}
-
-function builders(adapter) {
-  return pmap(adapter.getBuilders(), function (builder) {
-    return pmap(adapter.getBuilds(builder), function (build) {
-      return id(build);
-    }).then(function (builds) {
-      return id(builder).then(function (id) {
-        return {
-          id: id,
-          html_url: builder.html_url,
-          name: builder.name,
-          builds: builds
-        };
-      });
-    });
-  });
-}
-
-function builds(adapter) {
-  return pfmap(adapter.getBuilders(), adapter.getBuilds).then(function (builds) {
-    const now = new Date();
-    const sorted = builds.sort( (a, b) => (b.end || now).getTime() - (a.end || now).getTime() );
-
-    return Promise.all(sorted.map(function (build) {
-      return id(build).then(function (id) {
-        return {
-          id: id,
-          html_url: build.html_url,
-          name: build.name,
-          number: build.number,
-          state: build.state,
-          start: build.start,
-          end: build.end
-        };
-      });
-    }));
-  });
 }
