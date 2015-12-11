@@ -60,7 +60,8 @@ export function Model(adapter, properties = {}) {
   this.builds = builds;
 
   function builders() {
-    return adapter.getBuilders()
+    return adapter.getInfo()
+      .then(info => adapter.getBuilders(info))
       .then(builders => Promise.all(builders.map(data => this.builder(data))));
   }
 
