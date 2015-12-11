@@ -20,7 +20,7 @@
     "test": "mocha --compilers js:babel-core/register"
   },
   "dependencies": {
-    "ci-adapter": "^0.1.2",
+    "ci-adapter": "^0.2.0",
     "url-template": "^2.0.6",
     "uuid-1345": "^0.99.6"
   },
