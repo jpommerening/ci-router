@@ -1,4 +1,3 @@
-import express from 'express';
 import { state } from 'ci-adapter';
 import { inherits } from 'util';
 import { parse as parseUrl } from 'url';
@@ -6,7 +5,6 @@ import { id } from './id';
 import { Model, Build, Builder } from './model';
 
 export function Router(adapter, options) {
-  const router = express.Router();
   const model = Model(adapter, {
     id: {
       get: function () {
@@ -14,37 +12,41 @@ export function Router(adapter, options) {
       }
     }
   });
+  const handlers = {
+    '/': function (req, res, next) {
+      const builders = model.builders();
+      const builds = model.builds();
 
-  router.get('/', function (req, res, next) {
-    const builders = model.builders();
-    const builds = model.builds();
+      Promise.all([
+        builders.then(builders => Promise.all(builders.map(builder => builder.id))),
+        builds.then(builds => Promise.all(builds.map(build => build.id))),
+        builds.then(builds => builds.filter(build => build.state === state.PENDING))
+      ]).then(([ builders, builds, pending ]) => ({ builders, builds, pending })).then(send(req, res), error(res));
+    },
+    '/builders': function (req, res, next) {
+      model.builders()
+        .then(builders => Promise.all(builders.map(builderData(req))))
+        .then(send(req, res), error(res));
+    },
+    '/builds': function (req, res, next) {
+      model.builds()
+        .then(builds => Promise.all(builds.map(buildData(req))))
+        .then(send(req, res), error(res));
+    },
+    '/latest': function (req, res, next) {
+      model.builds()
+        .then(builds => buildData(req)(builds[ 0 ]))
+        .then(send(req, res), error(res));
+    }
+  };
 
-    Promise.all([
-      builders.then(builders => Promise.all(builders.map(builder => builder.id))),
-      builds.then(builds => Promise.all(builds.map(build => build.id))),
-      builds.then(builds => builds.filter(build => build.state === state.PENDING))
-    ]).then(([ builders, builds, pending ]) => ({ builders, builds, pending })).then(send(req, res), error(res));
-  });
-
-  router.get('/builders', function (req, res, next) {
-    model.builders()
-      .then(builders => Promise.all(builders.map(builderData(req))))
-      .then(send(req, res), error(res));
-  });
-
-  router.get('/builds', function (req, res, next) {
-    model.builds()
-      .then(builds => Promise.all(builds.map(buildData(req))))
-      .then(send(req, res), error(res));
-  });
-
-  router.get('/latest', function (req, res, next) {
-    model.builds()
-      .then(builds => buildData(req)(builds[ 0 ]))
-      .then(send(req, res), error(res));
-  });
-
-  return router;
+  return function (req, res, next) {
+    if (req.method === 'GET' && req.url in handlers) {
+      return handlers[req.url](req, res, next);
+    } else {
+      return next();
+    }
+  };
 }
 
 
